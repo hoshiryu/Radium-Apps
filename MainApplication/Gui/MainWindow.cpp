@@ -384,14 +384,14 @@ void MainWindow::onSelectionChanged( const QItemSelection& /*selected*/,
         {
             m_editRenderObjectButton->setEnabled( true );
 
-            m_materialEditor->changeRenderObject( ent.m_roIndex );
-            auto material = mainApp->m_engine->getRenderObjectManager()
-                                ->getRenderObject( ent.m_roIndex )
-                                ->getMaterial();
-            const std::string& shaderName = material->getMaterialName();
-            CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
-                         "RO shaders must be already added to the list" );
-            m_currentShaderBox->setCurrentText( shaderName.c_str() );
+//            m_materialEditor->changeRenderObject( ent.m_roIndex );
+//            auto material = mainApp->m_engine->getRenderObjectManager()
+//                                ->getRenderObject( ent.m_roIndex )
+//                                ->getMaterial();
+//            const std::string& shaderName = material->getMaterialName();
+//            CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
+//                         "RO shaders must be already added to the list" );
+//            m_currentShaderBox->setCurrentText( shaderName.c_str() );
             // m_currentShaderBox->setEnabled( true ); // commented out, as there is no simple way
             // to change the material type
         }
