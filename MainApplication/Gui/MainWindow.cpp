@@ -200,6 +200,7 @@ void MainWindow::createConnections() {
     connect( m_clearSceneButton, &QPushButton::clicked, this, &MainWindow::resetScene );
     connect( m_fitCameraButton, &QPushButton::clicked, this, &MainWindow::fitCamera );
     connect( m_showHideAllButton, &QPushButton::clicked, this, &MainWindow::showHideAllRO );
+    connect( m_exportMeshEveryFrame, &QPushButton::toggled, this, &MainWindow::exportMeshEveryFrame );
 
     // Renderer stuff
     connect(
@@ -613,6 +614,31 @@ void MainWindow::onFrameComplete() {
         m_timeline->onChangeCursor( engine->getTime() );
         m_lockTimeSystem = false;
     }
+    if ( m_exportMeshes )
+    {
+        Ra::IO::OBJFileManager obj;
+
+        auto roMngr = Engine::RadiumEngine::getInstance()->getRenderObjectManager();
+        for ( auto ro : roMngr->getRenderObjects() )
+        {
+            const std::shared_ptr<Engine::Displayable>& displ = ro->getMesh();
+            const Engine::Mesh* mesh = dynamic_cast<Engine::Mesh*>( displ.get() );
+
+            std::stringstream filenameStream;
+            filenameStream << mainApp->getExportFolderName() << "/radiummesh_"
+                           << ro->getName() << "_" << std::setw( 6 )
+                           << std::setfill( '0' ) << mainApp->getFrameCount();
+            std::string filename = filenameStream.str();
+
+            if ( mesh != nullptr && obj.save( filename, mesh->getCoreGeometry() ) )
+            {
+                LOG( logINFO ) << "Mesh from " << ro->getName() << " successfully exported to "
+                               << filename;
+            }
+            else
+            { LOG( logERROR ) << "Mesh from " << ro->getName() << "failed to export"; }
+        }
+    }
 }
 
 void MainWindow::addRenderer( const std::string& name, std::shared_ptr<Engine::Renderer> e ) {
@@ -713,6 +739,10 @@ void MainWindow::exportCurrentMesh() {
     }
     else
     { LOG( logWARNING ) << "Current entry was not a render object. No mesh was exported."; }
+}
+
+void MainWindow::exportMeshEveryFrame( bool on ) {
+    m_exportMeshes = on;
 }
 
 void MainWindow::deleteCurrentItem() {

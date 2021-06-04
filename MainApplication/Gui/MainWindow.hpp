@@ -158,6 +158,9 @@ class MainWindow : public Ra::GuiBase::MainWindowInterface, private Ui::MainWind
     /// Exports the mesh of the currently selected object to a file.
     void exportCurrentMesh();
 
+    /// Exports each mesh of the scene to a file at each frame.
+    void exportMeshEveryFrame( bool on );
+
     /// Remove the currently selected item (entity, component or ro)
     void deleteCurrentItem();
 
@@ -225,6 +228,8 @@ class MainWindow : public Ra::GuiBase::MainWindowInterface, private Ui::MainWind
 
     /// Guard TimeSystem against issue with Timeline signals.
     bool m_lockTimeSystem{false};
+
+    bool m_exportMeshes{false};
 };
 
 } // namespace Gui

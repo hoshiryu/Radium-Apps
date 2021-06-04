@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1350</width>
-    <height>936</height>
+    <height>943</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -27,7 +27,7 @@
      <x>0</x>
      <y>0</y>
      <width>1350</width>
-     <height>22</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFILE">
@@ -134,10 +134,10 @@
                 </property>
                </widget>
               </item>
-              <item row="0" column="2">
-               <widget class="QPushButton" name="m_exportMeshButton">
+              <item row="1" column="1">
+               <widget class="QPushButton" name="m_clearSceneButton">
                 <property name="text">
-                 <string>Export Mesh</string>
+                 <string>Clear Scene</string>
                 </property>
                </widget>
               </item>
@@ -148,6 +148,13 @@
                 </property>
                </widget>
               </item>
+              <item row="0" column="0">
+               <widget class="QPushButton" name="m_showHideAllButton">
+                <property name="text">
+                 <string>Show/Hide All</string>
+                </property>
+               </widget>
+              </item>
               <item row="1" column="0">
                <widget class="QPushButton" name="m_removeEntityButton">
                 <property name="text">
@@ -155,17 +162,20 @@
                 </property>
                </widget>
               </item>
-              <item row="1" column="1">
-               <widget class="QPushButton" name="m_clearSceneButton">
+              <item row="0" column="2">
+               <widget class="QPushButton" name="m_exportMeshButton">
                 <property name="text">
-                 <string>Clear Scene</string>
+                 <string>Export Mesh</string>
                 </property>
                </widget>
               </item>
-              <item row="0" column="0">
-               <widget class="QPushButton" name="m_showHideAllButton">
+              <item row="2" column="0" colspan="3">
+               <widget class="QPushButton" name="m_exportMeshEveryFrame">
                 <property name="text">
-                 <string>Show/Hide All</string>
+                 <string>Export Mesh Every Frame</string>
+                </property>
+                <property name="checkable">
+                 <bool>true</bool>
                 </property>
                </widget>
               </item>
@@ -175,15 +185,22 @@
           </item>
           <item>
            <layout class="QGridLayout" name="gridLayout_2">
-            <item row="1" column="2">
+            <item row="2" column="1">
+             <widget class="QLabel" name="m_currentColorButtonLabel">
+              <property name="text">
+               <string>Background Color</string>
+              </property>
+              <property name="buddy">
+               <cstring>m_currentColorButton</cstring>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
              <widget class="QPushButton" name="m_currentColorButton">
               <property name="text">
                <string/>
               </property>
              </widget>
-            </item>
-            <item row="0" column="2">
-             <widget class="QComboBox" name="m_currentShaderBox"/>
             </item>
             <item row="0" column="1">
              <widget class="QLabel" name="m_currentShaderBoxLabel">
@@ -195,15 +212,8 @@
               </property>
              </widget>
             </item>
-            <item row="1" column="1">
-             <widget class="QLabel" name="m_currentColorButtonLabel">
-              <property name="text">
-               <string>Background Color</string>
-              </property>
-              <property name="buddy">
-               <cstring>m_currentColorButton</cstring>
-              </property>
-             </widget>
+            <item row="0" column="2">
+             <widget class="QComboBox" name="m_currentShaderBox"/>
             </item>
            </layout>
           </item>
@@ -799,7 +809,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset>
+    <iconset resource="../../Resources/ApplicationIcons.qrc">
      <normaloff>:/Resources/Icons/play_off.png</normaloff>
      <normalon>:/Resources/Icons/pause_off.png</normalon>
      <activeoff>:/Resources/Icons/play_on.png</activeoff>
