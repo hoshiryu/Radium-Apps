@@ -34,6 +34,8 @@ set(app_sources
         Gui/MainWindow.cpp
         Gui/MaterialEditor.cpp
         Gui/TransformEditorWidget.cpp
+        mdd_file_loader/endianess.cpp
+        mdd_file_loader/point_cache_export.cpp
     )
 
 set(app_headers
@@ -44,6 +46,8 @@ set(app_headers
         Gui/RotationEditor.hpp
         Gui/TransformEditorWidget.hpp
         Gui/VectorEditor.hpp
+        mdd_file_loader/endianess.hpp
+        mdd_file_loader/point_cache_export.hpp
    )
 
 set(app_uis

@@ -33,6 +33,9 @@
 #include <QSettings>
 #include <QToolButton>
 
+#include <mdd_file_loader/endianess.hpp>
+#include <mdd_file_loader/point_cache_export.hpp>
+
 using Ra::Engine::ItemEntry;
 
 namespace Ra {
@@ -84,6 +87,8 @@ MainWindow::MainWindow( QWidget* parent ) : MainWindowInterface( parent ) {
 
     // load default color from QSettings
     updateBackgroundColor();
+
+    asset::endianess::init();
 }
 
 MainWindow::~MainWindow() {
@@ -604,6 +609,92 @@ void MainWindow::onRendererReady() {
     updateDisplayedTexture();
 }
 
+bool findDuplicates( const Ra::Core::Geometry::TriangleMesh& mesh, std::vector<Index>& duplicatesMap ) {
+    bool hasDuplicates = false;
+    duplicatesMap.clear();
+    const size_t numVerts = mesh.vertices().size();
+    duplicatesMap.resize( numVerts, Index::Invalid() );
+
+    std::vector<std::pair<Ra::Core::Vector3, Index>> vertices( numVerts );
+
+#pragma omp parallel for schedule( static )
+    for ( int i = 0; i < int( numVerts ); ++i )
+    {
+        vertices[uint( i )] = std::make_pair( mesh.vertices()[uint( i )], Index( i ) );
+    }
+
+    std::sort( vertices.begin(), vertices.end(), []( const auto& a, const auto& b ) {
+        if ( a.first.x() == b.first.x() )
+        {
+            if ( a.first.y() == b.first.y() )
+                if ( a.first.z() == b.first.z() )
+                    return a.second < b.second;
+                else
+                    return a.first.z() < b.first.z();
+            else
+                return a.first.y() < b.first.y();
+        }
+        return a.first.x() < b.first.x();
+    } );
+
+    // Here vertices contains vertex pos and idx, with equal
+    // vertices contiguous, sorted by idx, so checking if current
+    // vertex equals the previous one state if its a duplicated
+    // vertex position.
+    duplicatesMap[uint( vertices[0].second )] = vertices[0].second;
+    for ( uint i = 1; i < numVerts; ++i )
+    {
+        if ( vertices[i].first == vertices[i - 1].first )
+        {
+            duplicatesMap[uint( vertices[i].second )] =
+                duplicatesMap[uint( vertices[i - 1].second )];
+            hasDuplicates = true;
+        } else
+        { duplicatesMap[uint( vertices[i].second )] = vertices[i].second; }
+    }
+
+    return hasDuplicates;
+}
+
+void removeDuplicates( Ra::Core::Geometry::TriangleMesh& mesh, std::vector<Index>& vertexMap ) {
+    std::vector<Index> duplicatesMap;
+    findDuplicates( mesh, duplicatesMap );
+
+    const size_t numVerts = mesh.vertices().size();
+    std::vector<Index> newIndices( numVerts, Index::Invalid() );
+    Ra::Core::Vector3Array uniqueVertices;
+    Ra::Core::Vector3Array uniqueNormals;
+    for ( uint i = 0; i < numVerts; ++i )
+    {
+        if ( duplicatesMap[i] == i )
+        {
+            newIndices[i] = int( uniqueVertices.size() );
+            uniqueVertices.push_back( mesh.vertices()[i] );
+            uniqueNormals.push_back( mesh.normals()[i] );
+        }
+    }
+
+    const size_t numTri = mesh.m_indices.size();
+#pragma omp parallel for schedule( static )
+    for ( int i = 0; i < int( numTri ); ++i )
+    {
+        for ( uint j = 0; j < 3; ++j )
+        {
+            uint oldIdx = mesh.m_indices[uint( i )]( j );
+            int newIdx = newIndices[uint( duplicatesMap[oldIdx] )];
+            mesh.m_indices[uint( i )]( j ) = uint( newIdx );
+        }
+    }
+
+    vertexMap.resize( numVerts );
+#pragma omp parallel for schedule( static )
+    for ( int i = 0; i < int( numVerts ); ++i )
+        vertexMap[uint( i )] = newIndices[uint( duplicatesMap[uint( i )] )];
+
+    mesh.setVertices( uniqueVertices );
+    mesh.setNormals( uniqueNormals );
+}
+
 void MainWindow::onFrameComplete() {
     tab_edition->updateValues();
     // update timeline only if time changed, to allow manipulation of keyframed objects
@@ -618,11 +709,24 @@ void MainWindow::onFrameComplete() {
     {
         Ra::IO::OBJFileManager obj;
 
+        static std::map<std::string, asset::loader::Point_cache_file> mdd_files;
+
         auto roMngr = Engine::RadiumEngine::getInstance()->getRenderObjectManager();
         for ( auto ro : roMngr->getRenderObjects() )
         {
             const std::shared_ptr<Engine::Displayable>& displ = ro->getMesh();
             const Engine::Mesh* mesh = dynamic_cast<Engine::Mesh*>( displ.get() );
+
+            // Here we can filter which mesh we want:
+            //   - Skeleton (why not)
+            //   - IS result (whatever the version)
+            //   - HRBF (marching cubes of it)
+            //   - SDF
+            if ( ro->getComponent()->getName().find("AC_") == std::string::npos &&
+                 ro->getName().find("ImplicitSkinning") == std::string::npos &&
+                 ro->getName().find("MarchingCubes") == std::string::npos &&
+                 ro->getName().find("SDF_") == std::string::npos )
+                continue;
 
             std::stringstream filenameStream;
             filenameStream << mainApp->getExportFolderName() << "/radiummesh_"
@@ -630,13 +734,43 @@ void MainWindow::onFrameComplete() {
                            << std::setfill( '0' ) << mainApp->getFrameCount();
             std::string filename = filenameStream.str();
 
-            if ( mesh != nullptr && obj.save( filename, mesh->getCoreGeometry() ) )
+            if ( mesh == nullptr )
+            {
+                LOG( logERROR ) << "Render Object " << ro->getName() << " has no mesh!";
+            }
+            // remove duplicates before export! (not enough, vertex index changed!)
+            auto triMesh = mesh->getCoreGeometry();
+            std::vector<Index> dupliMap;
+            removeDuplicates( triMesh, dupliMap );
+            if ( obj.save( filename, triMesh ) )
             {
                 LOG( logINFO ) << "Mesh from " << ro->getName() << " successfully exported to "
                                << filename;
             }
             else
             { LOG( logERROR ) << "Mesh from " << ro->getName() << "failed to export"; }
+
+            // add a frame to the corresponding mdd file and export it
+            // warning: the file will be overriden at each frame!
+            auto it = mdd_files.find( ro->getName() );
+            if ( it == mdd_files.end() )
+            {
+                // first frame: init file with number of vertices
+                mdd_files.emplace( std::make_pair( ro->getName(), asset::loader::Point_cache_file( triMesh.vertices().size(), 100 ) ) );
+            }
+            // fill the file frame
+            const auto& V = triMesh.vertices();
+            std::vector<float> vertices( V.size() * 3 );
+#pragma omp parallel for
+            for ( int i = 0; i < V.size(); ++i )
+            {
+                vertices[3*i] = V[i].x();
+                vertices[3*i+1] = V[i].y();
+                vertices[3*i+2] = V[i].z();
+            }
+            // add and export the whole
+            mdd_files[ro->getName()].add_frame( vertices.data() );
+            mdd_files[ro->getName()].export_mdd( mainApp->getExportFolderName() + "/" + ro->getName() + ".mdd" );
         }
     }
 }
