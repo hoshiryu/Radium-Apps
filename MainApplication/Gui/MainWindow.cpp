@@ -863,7 +863,10 @@ void MainWindow::exportCurrentMesh() {
         const std::shared_ptr<Engine::Displayable>& displ = ro->getMesh();
         const Engine::Mesh* mesh = dynamic_cast<Engine::Mesh*>( displ.get() );
 
-        if ( mesh != nullptr && obj.save( filename, mesh->getCoreGeometry() ) )
+        auto triMesh = mesh->getCoreGeometry();
+        std::vector<Index> dupliMap;
+        removeDuplicates( triMesh, dupliMap );
+        if ( mesh != nullptr && obj.save( filename, triMesh ) )
         {
             LOG( logINFO ) << "Mesh from " << ro->getName() << " successfully exported to "
                            << filename;
