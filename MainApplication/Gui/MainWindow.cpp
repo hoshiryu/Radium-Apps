@@ -710,6 +710,7 @@ void MainWindow::onFrameComplete() {
         Ra::IO::OBJFileManager obj;
 
         static std::map<std::string, asset::loader::Point_cache_file> mdd_files;
+        static std::map<std::string, std::tuple<std::vector<Index>,Ra::Core::Geometry::TriangleMesh>> mdd_triMesh;
 
         auto roMngr = Engine::RadiumEngine::getInstance()->getRenderObjectManager();
         for ( auto ro : roMngr->getRenderObjects() )
@@ -740,28 +741,35 @@ void MainWindow::onFrameComplete() {
             {
                 LOG( logERROR ) << "Render Object " << ro->getName() << " has no mesh!";
             }
-            // remove duplicates before export! (not enough, vertex index changed!)
-            auto triMesh = mesh->getCoreGeometry();
-            std::vector<Index> dupliMap;
-            removeDuplicates( triMesh, dupliMap );
-            if ( obj.save( filename, triMesh ) )
-            {
-                LOG( logINFO ) << "Mesh from " << ro->getName() << " successfully exported to "
-                               << filename;
-            }
-            else
-            { LOG( logERROR ) << "Mesh from " << ro->getName() << "failed to export"; }
 
             // add a frame to the corresponding mdd file and export it
             // warning: the file will be overriden at each frame!
             auto it = mdd_files.find( ro->getName() );
+
+            // first frame:
             if ( it == mdd_files.end() )
             {
-                // first frame: init file with number of vertices
+                // remove duplicates
+                auto triMesh = mesh->getCoreGeometry();
+                std::vector<Index> dupliMap;
+                removeDuplicates( triMesh, dupliMap );
+
+                // init file with number of vertices and store mesh as topomesh
                 mdd_files.emplace( std::make_pair( ro->getName(), asset::loader::Point_cache_file( triMesh.vertices().size(), 100 ) ) );
+                mdd_triMesh.emplace( std::make_pair( ro->getName(), std::make_tuple( dupliMap, triMesh ) ) );
             }
+
+            // updated the triMesh vertices
+            auto& [dupliMap,triMesh] = mdd_triMesh[ro->getName()];
+            const auto& newV = mesh->getCoreGeometry().vertices();
+            auto& V = triMesh.verticesWithLock();
+            for ( uint i = 0; i < newV.size(); ++i )
+            {
+                V[ dupliMap[i] ] = newV[i];
+            }
+            triMesh.verticesUnlock();
+
             // fill the file frame
-            const auto& V = triMesh.vertices();
             std::vector<float> vertices( V.size() * 3 );
 #pragma omp parallel for
             for ( int i = 0; i < V.size(); ++i )
@@ -773,6 +781,15 @@ void MainWindow::onFrameComplete() {
             // add and export the whole
             mdd_files[ro->getName()].add_frame( vertices.data() );
             mdd_files[ro->getName()].export_mdd( mainApp->getExportFolderName() + "/" + ro->getName() + ".mdd" );
+
+            // also export as obj
+            if ( obj.save( filename, triMesh ) )
+            {
+                LOG( logINFO ) << "Mesh from " << ro->getName() << " successfully exported to "
+                               << filename;
+            }
+            else
+            { LOG( logERROR ) << "Mesh from " << ro->getName() << "failed to export"; }
         }
     }
 }
