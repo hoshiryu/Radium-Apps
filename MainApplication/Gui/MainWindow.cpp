@@ -719,13 +719,15 @@ void MainWindow::onFrameComplete() {
 
             // Here we can filter which mesh we want:
             //   - Skeleton (why not)
+            //   - Geometric skinning
             //   - IS result (whatever the version)
             //   - HRBF (marching cubes of it)
             //   - SDF
             if ( ro->getComponent()->getName().find("AC_") == std::string::npos &&
+                 ro->getName().find("GEOM") == std::string::npos &&
                  ro->getName().find("ImplicitSkinning") == std::string::npos &&
                  ro->getName().find("MarchingCubes") == std::string::npos &&
-                 ro->getName().find("SDF_") == std::string::npos )
+                 ro->getName().find("SDF") == std::string::npos )
                 continue;
 
             std::stringstream filenameStream;
